@@ -31,7 +31,7 @@ def main():
 
 
 class Ktane():
-    """ Class that track the game state and controls the lights """
+    """ Class that tracks the game state and controls the lights """
     def __init__(self):
         self.b = Bridge(BRIDGE)
         self.b.connect()
@@ -217,13 +217,14 @@ class Ktane():
         l.saturation = 254
 
     def color_black(self, l):
+        """Not exactly black"""
         l.hue = 47125
         l.saturation = 0
 
 
 def parse_log(log, kt):
     """Parse log (list of lines). Pass useful state updates to kt."""
-    log = list(log)
+    log = list(log) # do we still need this?
     for line in log:
         if '[State]' in line or '[Bomb]' in line or '[PostGameState]' in line:
             # DEBUG 2015-12-24 18:57:49,884 [Assets.Scripts.Pacing.PaceMaker] Round start! Mission: The First Bomb Pacing Enabled: False

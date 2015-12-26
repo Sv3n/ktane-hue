@@ -49,6 +49,7 @@ class KtaneState(Enum):
     in_game = 1
     exploding = 2
     post_mortem = 3
+    in_game_quick = 4
 
 
 class KtaneAction(IntEnum):
@@ -65,7 +66,8 @@ class KtaneAction(IntEnum):
     strike4 = 10
     strike5 = 11
     result_screen_dismissed_retry = 12
-    unknown = 13
+    one_minute_left = 13
+    unknown = 14
 
 
 class Ktane():
@@ -77,9 +79,7 @@ class Ktane():
 
         self.state = KtaneState.in_menu
 
-        self.round_started = False
         self.pulse = 0
-        self.exploded = False
         self.strikes = 0
         self.won = False
 
@@ -91,11 +91,14 @@ class Ktane():
             else:
                 l.brightness = 40
 
+    def game_active(self):
+        return self.state == KtaneState.in_game or self.state == KtaneState.in_game_quick
+
     def tick(self):
         """The function called by our main event loop"""
-        if self.exploded:
+        if self.state == KtaneState.exploding:
             self.explode()
-        elif self.round_started:
+        elif self.game_active():
             self.do_pulse()
 
     def explode(self):
@@ -116,8 +119,7 @@ class Ktane():
 
         self.pulse += 1
         if self.pulse == 50:
-            self.round_started = False
-            self.exploded = False
+            self.state = KtaneState.post_mortem
             self.pulse = 0
             self.post_mortem()
 
@@ -133,7 +135,11 @@ class Ktane():
 
         for lamp in self.color_lamps:
             if self.pulse == 0:
-                self.color_mild_orange(lamp)
+                if self.state == KtaneState.in_game_quick:
+                    self.color_mild_red(lamp)
+                else:
+                    self.color_mild_orange(lamp)
+
             elif self.pulse == 24 / div:
                 self.color_orange(lamp)
 
@@ -175,17 +181,17 @@ class Ktane():
 
     def action(self, action):
         if action == KtaneAction.round_started:
-            if not self.round_started:
+            if not self.game_active():
                 self.start_round()
 
         if action == KtaneAction.round_ended:
-            if not self.exploded:
+            if self.state != KtaneState.exploding:
                 self.stop_round()
 
         if action == KtaneAction.explode:
-            if self.exploded is False:
+            if self.state != KtaneState.exploding:
+                self.state = KtaneState.exploding
                 logger.debug("exploded")
-                self.exploded = True
                 self.quick_transitions()
                 self.pulse = 0
 
@@ -209,14 +215,16 @@ class Ktane():
                 if self.strikes == 2:
                     self.quarter_transitions()
 
+        if action == KtaneAction.one_minute_left:
+            self.state = KtaneState.in_game_quick
+
     def start_round(self):
         """Reset state, start round"""
         logger.debug("start_round()")
         self.normal_transitions()
-        self.exploded = False
+        self.state = KtaneState.in_game
         self.won = False
         self.strikes = 0
-        self.round_started = True
 
     def menu_mode_all(self):
         """Set all lamps to menu mode"""
@@ -226,7 +234,7 @@ class Ktane():
     def stop_round(self):
         """Stop round, back to menu mode"""
         logger.debug("Stopped round")
-        self.round_started = False
+        self.state = KtaneState.in_menu
         self.normal_transitions()
         self.menu_mode_all()
 
@@ -242,6 +250,9 @@ class Ktane():
 
     def color_red(self, l):
         self.color_set(65535, 254, l)
+
+    def color_mild_red(self, l):
+        self.color_set(65535, 150, l)
 
     def color_magenta(self, l):
         self.color_set(55535, 254, l)
@@ -282,19 +293,19 @@ class KtaneLogParse:
 
     def parse_log(self, lines, kt):
         """Parse log (list of lines). Pass useful state updates to kt."""
-        for line in lines[0:2000]:
-            if '[State]' in line or '[Bomb]' in line or '[PostGameState]' in line:
+        for line in lines:
+            if '[State]' in line or '[Bomb]' in line or '[PostGameState]' in line or '[Assets.Scripts.Pacing.PaceMaker]' in line:
                 logger.info('--------> {line}'.format(line=line))
                 # DEBUG 2015-12-24 18:57:49,884 [Assets.Scripts.Pacing.PaceMaker] Round start! Mission: The First Bomb Pacing Enabled: False
 
-                r = r"[ ]*(?P<log_type>[A-Z]+) (?P<start_time>[^\[]*) \[(?P<component>State|Bomb|PostGameState)\] (?P<state_info>.*)"
+                r = r"[ ]*(?P<log_type>[A-Z]+) (?P<start_time>[^\[]*) \[(?P<component>[^\]]*)\] (?P<state_info>.*)"
                 m = re.match(r, line)
                 res = m.groupdict()
 
                 t = self.parse_time_str(res['start_time'])
                 now = datetime.datetime.now()
 
-                action = self.parse_action(res['state_info'])
+                action = self.parse_action(res['state_info'], res['component'])
                 logger.info(action)
 
                 if abs(t - now) < datetime.timedelta(seconds=0.3) or True:
@@ -302,7 +313,7 @@ class KtaneLogParse:
                     # logger.info("State changed to {state}".format(state=res['state_info']))
                     kt.action(action)
 
-    def parse_action(self, state_info):
+    def parse_action(self, state_info, component):
         """Called by the parser when it picks up a new log entry of interest"""
         if state_info == 'Enter GameplayState':
             return KtaneAction.round_started
@@ -322,7 +333,10 @@ class KtaneLogParse:
         if state_info == 'Results screen bomb binder dismissed (retry). Retrying same mission...':
             return KtaneAction.result_screen_dismissed_retry
 
-        if "strike" in state_info:
+        if state_info == "Executing random action of type OneMinuteLeft":
+            return KtaneAction.one_minute_left
+
+        if component == "Bomb" and "strike" in state_info:
             new_strikes = int(state_info[8])
 
             if new_strikes == 1:

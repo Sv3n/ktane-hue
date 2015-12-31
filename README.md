@@ -9,16 +9,22 @@ Control hue lights based on ktane (Keep Talking and Nobody Explodes) game state.
  * [phue](https://github.com/studioimaginaire/phue)
 
 ## Setup
-Copy the script to your ktane folder. Update the following sections to reflect your own setup:
+Copy the script to your ktane folder. The script has one mandatory, and one optional command line argument:
 
-```python
-# A list with the light ids of the lamps the game should control
-COLOR_LAMPS = ["light1", "light2"]
+```bash
+D:\SteamLibrary\steamapps\common\Keep Talking and Nobody Explodes> python.exe .\ktane_hue.py --help
+usage: ktane_hue.py [-h] --bridge BRIDGE_IP [--explode]
 
-# The ip of the bridge
-BRIDGE = '192.168.0.42'
+ktane_hue
+
+optional arguments:
+  -h, --help          show this help message and exit
+  --bridge BRIDGE_IP  Set the bridge ip
+  --explode           Test the explosion animation
 ```
 
-You will have to push the button on the bridge once to allow the `b.connect` call to handshake with the bridge. Now run the script (`python3.exe ktane_hue.py` or something similar). After the inital run, the script can be run without pushing the button.
+Run the script with the `--bridge` parameter pointing to the ip of your hue bridge. (`python.exe ktane_hue.py --bridge 192.168.0.12` or something similar).
+
+You will have to push the button on the bridge once to allow the `b.connect` call to handshake with the bridge.  After the inital run, the script can be run without pushing the button.
 
 Now you can launch ktane, and the lights should be responding to the game.

@@ -18,10 +18,6 @@ logger = None
 
 SETTINGS = 'ktane_hue.json'
 
-# A list with the light ids of the lamps the game should control
-COLOR_LAMPS = ["light1", "light2"]
-
-
 def parse_arguments():
     parser = argparse.ArgumentParser(description='ktane_hue')
     parser.add_argument('--bridge', dest='bridge_ip', type=str, required=True, help='Set the bridge ip')
@@ -35,6 +31,8 @@ def main():
     if not os.path.exists(SETTINGS):
         pass
     kt = Ktane(args.bridge_ip)
+    if len(kt.color_lamps) == 0:
+        logger.error("No color lamps found. Exiting....")
 
     # We run from the ktane folder
     lp = KtaneLogParse('logs/ktane.log')
@@ -106,11 +104,15 @@ class Ktane():
 
         self.color_lamps = []
         for l in self.b.lights:
-            if l.name in COLOR_LAMPS:
-                self.menu_mode(l)
-                self.color_lamps.append(l)
-            else:
+            try:
+                dummy = l.hue
+            except KeyError:
+                # All the non-color lamps get dimmed
                 l.brightness = 40
+                continue
+            self.menu_mode(l)
+            self.color_lamps.append(l)
+
         logger.info("Initialized ktane_hue")
 
     def game_active(self):

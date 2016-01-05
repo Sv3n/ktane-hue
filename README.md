@@ -1,6 +1,16 @@
 # ktane-hue
 Control hue lights based on ktane (Keep Talking and Nobody Explodes) game state. See [my blog](http://svengoossens.nl/2015/12/25/ktane-hue/) for some more details.
 
+# Features / detected events
+
+ * Dims all non-color lights that were switched on
+ * In the menu, sets all color lights to a yellowy-white tone
+ * In game, color lights pulse between red-orange and orange when you have 0 or 1 strike
+ * In game, color lights pulse between red-pink and orange when you have 2 or more strikes, or there is less than 1 minute left
+ * For each strike, the pulse frequency increases
+ * When the bomb explodes, lights flash in satisfying pallet of yellow / green and red, and then dim down to a low intensity red
+ * In the post-mortem screen (where you can see the reason you exploded), lights get a hard-white color
+
 ## Requirements
 
  * Python 3

@@ -85,7 +85,8 @@ class KtaneAction(IntEnum):
     strike5 = 11
     result_screen_dismissed_retry = 12
     one_minute_left = 13
-    unknown = 14
+    menu_return_to_setup_room = 14
+    unknown = 15
 
 
 class Ktane():
@@ -237,7 +238,7 @@ class Ktane():
         if action == KtaneAction.win:
             self.won = True
 
-        if action == KtaneAction.result_screen_dismissed_to_menu:
+        if action == KtaneAction.result_screen_dismissed_to_menu or action == KtaneAction.menu_return_to_setup_room:
             self.stop_round()
 
         if action == KtaneAction.result_screen_dismissed_retry:
@@ -326,7 +327,10 @@ class KtaneLogParse:
     def __init__(self, fname):
         self.fname = fname
         # Correct for local timezone (log contains UTC)
-        self.local_tz = time.timezone
+        if not time.daylight:
+            self.local_tz = time.timezone
+        else:
+            self.local_tz = time.altzone
 
     def parse_time_str(self, time_str):
         t = datetime.datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S,%f')
@@ -344,6 +348,7 @@ class KtaneLogParse:
         for line in lines[-400:-1]:
             if '[State]' in line or \
                '[Bomb]' in line or \
+               '[MenuPage]' in line or \
                '[PostGameState]' in line or \
                '[Assets.Scripts.Pacing.PaceMaker]' in line or \
                '[Assets.Scripts.DossierMenu.MenuPage]' in line:
@@ -388,19 +393,28 @@ class KtaneLogParse:
         if state_info == "Executing random action of type OneMinuteLeft":
             return KtaneAction.one_minute_left
 
-        if component == "Bomb" and "strike" in state_info:
-            new_strikes = int(state_info[8])
+        if component == "MenuPage" and state_info == "ReturnToSetupRoom":
+            return KtaneAction.menu_return_to_setup_room
 
-            if new_strikes == 1:
-                return KtaneAction.strike1
-            if new_strikes == 2:
-                return KtaneAction.strike2
-            if new_strikes == 3:
-                return KtaneAction.strike3
-            if new_strikes == 4:
-                return KtaneAction.strike4
-            if new_strikes == 5:
-                return KtaneAction.strike5
+        if component == "Bomb" and "strike" in state_info:
+            r = r".*? (?P<strike>[0-9]*) / (?P<out_of>[0-9]*) .*?"
+            m = re.match(r, state_info)
+            if m is not None:
+                res = m.groupdict()
+                new_strikes = int(res['strike'])
+
+                if new_strikes == 1:
+                    return KtaneAction.strike1
+                if new_strikes == 2:
+                    return KtaneAction.strike2
+                if new_strikes == 3:
+                    return KtaneAction.strike3
+                if new_strikes == 4:
+                    return KtaneAction.strike4
+                if new_strikes == 5:
+                    return KtaneAction.strike5
+            else:
+                logger.debug('Got [Bomb] report with unexpected format: {}'.format(state_info))
 
         return KtaneAction.unknown
 

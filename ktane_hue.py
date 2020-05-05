@@ -349,6 +349,7 @@ class KtaneLogParse:
             if '[State]' in line or \
                '[Bomb]' in line or \
                '[MenuPage]' in line or \
+               '[PaceMaker]' in line or \
                '[PostGameState]' in line or \
                '[Assets.Scripts.Pacing.PaceMaker]' in line or \
                '[Assets.Scripts.DossierMenu.MenuPage]' in line:
